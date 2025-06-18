@@ -1,17 +1,27 @@
 from flask import Flask, request, jsonify
-import pandas as pd
-import os
-from datetime import datetime
 from flask_cors import CORS
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime
+import os
+import json
 
 app = Flask(__name__)
 CORS(app)
 
-EXCEL_FILE = 'registrations.xlsx'
+# Ανάγνωση credentials από μεταβλητή περιβάλλοντος στο Render
+credentials_json = os.environ.get("GOOGLE_CREDS_JSON")
+if not credentials_json:
+    raise Exception("Λείπει η μεταβλητή GOOGLE_CREDS_JSON")
 
-if not os.path.exists(EXCEL_FILE):
-    df = pd.DataFrame(columns=["ID", "Ονοματεπώνυμο", "Τηλέφωνο", "Email", "Ημερομηνία"])
-    df.to_excel(EXCEL_FILE, index=False)
+# Σύνδεση με Google Sheets
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds_dict = json.loads(credentials_json)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client = gspread.authorize(creds)
+
+# Άνοιγμα Google Sheet
+sheet = client.open("Εγγραφές Landing").sheet1
 
 @app.route('/submit', methods=['POST'])
 def submit():
@@ -19,22 +29,14 @@ def submit():
     fullname = data.get('fullname')
     phone = data.get('phone')
     email = data.get('email')
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    df = pd.read_excel(EXCEL_FILE)
-    next_id = 1 if df.empty else df['ID'].max() + 1
+    all_records = sheet.get_all_values()
+    next_id = len(all_records)
 
-    new_entry = {
-        "ID": next_id,
-        "Ονοματεπώνυμο": fullname,
-        "Τηλέφωνο": phone,
-        "Email": email,
-        "Ημερομηνία": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-
-    df = pd.concat([df, pd.DataFrame([new_entry])], ignore_index=True)
-    df.to_excel(EXCEL_FILE, index=False)
-
-    return jsonify({"success": True, "message": "Εγγραφή επιτυχής."})
+    sheet.append_row([next_id, fullname, phone, email, timestamp])
+    return jsonify({"success": True, "message": "Εγγραφή στο Google Sheet επιτυχής."})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
