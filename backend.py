@@ -7,7 +7,7 @@ import os
 import json
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Ανάγνωση credentials από μεταβλητή περιβάλλοντος στο Render
 credentials_json = os.environ.get("GOOGLE_CREDS_JSON")
