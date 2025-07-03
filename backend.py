@@ -23,7 +23,7 @@ client = gspread.authorize(creds)
 # Άνοιγμα Google Sheet
 sheet = client.open("Εγγραφές Landing").sheet1
 
-@app.route('/submit', methods=['POST'])
+@app.route("/submit", methods=["POST"])
 def submit():
     data = request.json
     fullname = data.get('fullname')
